@@ -11,7 +11,7 @@ pub trait DetailedError : std::error::Error
     
     fn new (kind : <Self as DetailedError>::Kind, cause : Option<Box<std::error::Error + Send + Sync>>, desc : String, file : &'static str, line : u32) -> Self;
     fn kind (&self) -> &<Self as DetailedError>::Kind;
-    fn trace (&self) -> &Vec<(&'static str, u32)>;
+    fn trace (&self) -> &[(&'static str, u32)];
 }
 
 
@@ -55,7 +55,7 @@ macro_rules! error_items
             #[inline]
             fn kind (&self) -> &$kind_name { &self.kind }
             #[inline]
-            fn trace (&self) -> &Vec<(&'static str, u32)> { &self.trace }
+            fn trace (&self) -> &[(&'static str, u32)] { &self.trace }
         }
         impl ::std::error::Error for $err_name
         {
@@ -156,6 +156,11 @@ macro_rules! from_err
         $crate::DetailedFromError::from_error($err, None, file!(), line!())
     );
     (
+        $err:expr; $detail:expr
+    ) => (
+        $crate::DetailedFromError::from_error($err, Some(format!("{}", $detail)), file!(), line!())
+    );
+    (
         $err:expr; $detail:expr, $($arg:tt)*
     ) => (
         $crate::DetailedFromError::from_error($err, Some(format!($detail, $($arg)*)), file!(), line!())
@@ -245,8 +250,8 @@ macro_rules! attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e);
-                err!((kind, cause) $desc)
+                let cause = $err_fn(e).into();
+                err!(kind, cause; $desc)
             },
         }
     );
@@ -257,7 +262,7 @@ macro_rules! attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e);
+                let cause = $err_fn(e).into();
                 err!(kind, cause; $desc, $($arg)*)
             },
         }
@@ -439,8 +444,8 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause : $err_fn(e);
-                p_err!(($prom) (kind, cause) $desc)
+                let cause = $err_fn(e).into();
+                p_err!(($prom) kind, cause; $desc)
             },
         }
     );
@@ -451,7 +456,7 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause : $err_fn(e);
+                let cause = $err_fn(e).into();
                 p_err!(($prom) kind, cause; $desc, $($arg)*)
             },
         }
@@ -480,8 +485,8 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause : $err_fn(e);
-                p_err!(($prom; $ret) (kind, cause) $desc)
+                let cause = $err_fn(e).into();
+                p_err!(($prom; $ret) kind, cause; $desc)
             },
         }
     );
@@ -492,7 +497,7 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause : $err_fn(e);
+                let cause = $err_fn(e).into();
                 p_err!(($prom; $ret) kind, cause; $desc, $($arg)*)
             },
         }
