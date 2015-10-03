@@ -34,7 +34,7 @@ macro_rules! error_items
             msg    : String,
             trace  : Vec<(&'static str, u32)>,
         }
-        impl $crate::error::DetailedError for $err_name
+        impl $crate::DetailedError for $err_name
         {
             type Kind = $kind_name;
             
@@ -71,7 +71,7 @@ macro_rules! error_items
                 }
             }
         }
-        impl $crate::error::DetailedFromError<$err_name> for $err_name
+        impl $crate::DetailedFromError<$err_name> for $err_name
         {
             fn from_error (mut e : $err_name, _ : Option<String>, file : &'static str, line : u32) -> $err_name
             {
@@ -79,7 +79,7 @@ macro_rules! error_items
                 e
             }
         }
-        //~ impl $crate::error::DetailedFromError<$err_name> for Box<::std::error::Error>
+        //~ impl $crate::DetailedFromError<$err_name> for Box<::std::error::Error>
         //~ {
             //~ fn from_error (mut e : $err_name, _ : Option<String>, file : &'static str, line : u32) -> Box<::std::error::Error>
             //~ {
@@ -127,22 +127,22 @@ macro_rules! new_err
     (
         $kind:expr; $desc:expr
     ) => (
-        $crate::error::DetailedError::new($kind, None, ::std::borrow::ToOwned::to_owned($desc), file!(), line!())
+        $crate::DetailedError::new($kind, None, ::std::borrow::ToOwned::to_owned($desc), file!(), line!())
     );
     (
         $kind:expr; $desc:expr, $($arg:tt)*
     ) => (
-        $crate::error::DetailedError::new($kind, None, format!($desc, $($arg)*), file!(), line!())
+        $crate::DetailedError::new($kind, None, format!($desc, $($arg)*), file!(), line!())
     );
     (
         $kind:expr, $cause:expr; $desc:expr
     ) => (
-        $crate::error::DetailedError::new($kind, Some($crate::error::coerce_box($cause)), ::std::borrow::ToOwned::to_owned($desc), file!(), line!())
+        $crate::DetailedError::new($kind, Some($crate::coerce_box($cause)), ::std::borrow::ToOwned::to_owned($desc), file!(), line!())
     );
     (
         $kind:expr, $cause:expr; $desc:expr, $($arg:tt)*
     ) => (
-        $crate::error::DetailedError::new($kind, Some($crate::error::coerce_box($cause)), format!($desc, $($arg)*), file!(), line!())
+        $crate::DetailedError::new($kind, Some($crate::coerce_box($cause)), format!($desc, $($arg)*), file!(), line!())
     );
 }
 
@@ -153,12 +153,12 @@ macro_rules! from_err
     (
         $err:expr
     ) => (
-        $crate::error::DetailedFromError::from_error($err, None, file!(), line!())
+        $crate::DetailedFromError::from_error($err, None, file!(), line!())
     );
     (
         $err:expr; $detail:expr, $($arg:tt)*
     ) => (
-        $crate::error::DetailedFromError::from_error($err, Some(format!($detail, $($arg)*)), file!(), line!())
+        $crate::DetailedFromError::from_error($err, Some(format!($detail, $($arg)*)), file!(), line!())
     )
 }
 
@@ -613,10 +613,10 @@ macro_rules! impl_from_error
             fn from (error : $src) -> $dest
             {
                 let kind = $kind_fn(&error);
-                $crate::error::DetailedError::new(kind, Some(Box::new(error) as Box<::std::error::Error + Send + Sync>), ::std::borrow::ToOwned::to_owned($desc), "<unknown>", 0)
+                $crate::DetailedError::new(kind, Some(Box::new(error) as Box<::std::error::Error + Send + Sync>), ::std::borrow::ToOwned::to_owned($desc), "<unknown>", 0)
             }
         }
-        impl $crate::error::DetailedFromError<$src> for $dest
+        impl $crate::DetailedFromError<$src> for $dest
         {
             fn from_error (error : $src, desc : Option<String>, file : &'static str, line : u32) -> $dest
             {
@@ -625,7 +625,7 @@ macro_rules! impl_from_error
                     Some(s) => format!("{}: {}", $desc, s),
                     None    => ::std::borrow::ToOwned::to_owned($desc),
                 };
-                $crate::error::DetailedError::new(kind, Some(Box::new(error) as Box<::std::error::Error + Send + Sync>), desc, file, line)
+                $crate::DetailedError::new(kind, Some(Box::new(error) as Box<::std::error::Error + Send + Sync>), desc, file, line)
             }
         }
     )
@@ -643,10 +643,10 @@ macro_rules! impl_from_val_error
             fn from_error (error : $src) -> $dest
             {
                 let kind = $kind_fn(&error);
-                $crate::error::DetailedError::new(kind, Some(Box::new($crate::api::error::ValueErr::new(error)) as Box<::std::error::Error + Send + Sync>), String::from_str($desc), "<unknown>", 0)
+                $crate::DetailedError::new(kind, Some(Box::new($crate::api::error::ValueErr::new(error)) as Box<::std::error::Error + Send + Sync>), String::from_str($desc), "<unknown>", 0)
             }
         }
-        impl $crate::error::DetailedFromError<$src> for $dest
+        impl $crate::DetailedFromError<$src> for $dest
         {
             fn from_error (error : $src, desc : Option<String>, file : &'static str, line : u32) -> $dest
             {
@@ -655,7 +655,7 @@ macro_rules! impl_from_val_error
                     Some(s) => format!("{}: {}", $desc, s),
                     None    => String::from_str($desc),
                 };
-                $crate::error::DetailedError::new(kind, Some(Box::new($crate::api::error::ValueErr::new(error)) as Box<::std::error::Error + Send + Sync>), desc, file, line)
+                $crate::DetailedError::new(kind, Some(Box::new($crate::api::error::ValueErr::new(error)) as Box<::std::error::Error + Send + Sync>), desc, file, line)
             }
         }
     )
@@ -675,12 +675,12 @@ macro_rules! impl_from_await_error
             {
                 match error {
                     ::alternate_future::AwaitError::Broken => {
-                        $crate::error::DetailedError::new($aborted_kind, None, ::std::borrow::ToOwned::to_owned($aborted_desc), "<unknown>", 0)
+                        $crate::DetailedError::new($aborted_kind, None, ::std::borrow::ToOwned::to_owned($aborted_desc), "<unknown>", 0)
                     },
                 }
             }
         }
-        impl $crate::error::DetailedFromError<::alternate_future::AwaitError> for $dest
+        impl $crate::DetailedFromError<::alternate_future::AwaitError> for $dest
         {
             fn from_error (error : ::alternate_future::AwaitError, desc : Option<String>, file : &'static str, line : u32) -> $dest
             {
@@ -690,7 +690,7 @@ macro_rules! impl_from_await_error
                             Some(s) => format!("{}: {}", $aborted_desc, s),
                             None    => ::std::borrow::ToOwned::to_owned($aborted_desc),
                         };
-                        $crate::error::DetailedError::new($aborted_kind, Some(Box::new(error) as Box<::std::error::Error + Send + Sync>), desc, file, line)
+                        $crate::DetailedError::new($aborted_kind, Some(Box::new(error) as Box<::std::error::Error + Send + Sync>), desc, file, line)
                     },
                 }
             }
