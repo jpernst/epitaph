@@ -137,12 +137,12 @@ macro_rules! new_err
     (
         $kind:expr, $cause:expr; $desc:expr
     ) => (
-        $crate::DetailedError::new($kind, Some($crate::coerce_box($cause)), ::std::borrow::ToOwned::to_owned($desc), file!(), line!())
+        $crate::DetailedError::new($kind, Some($cause.into()), ::std::borrow::ToOwned::to_owned($desc), file!(), line!())
     );
     (
         $kind:expr, $cause:expr; $desc:expr, $($arg:tt)*
     ) => (
-        $crate::DetailedError::new($kind, Some($crate::coerce_box($cause)), format!($desc, $($arg)*), file!(), line!())
+        $crate::DetailedError::new($kind, Some($cause.into()), format!($desc, $($arg)*), file!(), line!())
     );
 }
 
@@ -232,7 +232,7 @@ macro_rules! attempt_err
     ) => (
         match $expr {
             Ok(val) => val,
-            Err(e)  => err!($kind_fn(&e), e.into(); $desc),
+            Err(e)  => err!($kind_fn(&e), e; $desc),
         }
     );
     (
@@ -240,7 +240,7 @@ macro_rules! attempt_err
     ) => (
         match $expr {
             Ok(val) => val,
-            Err(e)  => err!($kind_fn(&e), e.into(); $desc, $($arg)*),
+            Err(e)  => err!($kind_fn(&e), e; $desc, $($arg)*),
         }
     );
     (
@@ -250,7 +250,7 @@ macro_rules! attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e).into();
+                let cause = $err_fn(e);
                 err!(kind, cause; $desc)
             },
         }
@@ -262,12 +262,249 @@ macro_rules! attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e).into();
+                let cause = $err_fn(e);
                 err!(kind, cause; $desc, $($arg)*)
             },
         }
     );
 }
+
+
+
+
+#[macro_export]
+macro_rules! f_ok
+{
+    (
+        ($func:expr) $expr:expr
+    ) => ({
+        $func(Ok($expr));
+        return;
+    });
+    (
+        ($func:expr; $ret:expr) $expr:expr
+    ) => ({
+        $func(Ok($expr));
+        return $ret;
+    });
+}
+#[macro_export]
+macro_rules! f_err
+{
+    (
+        ($func:expr) $kind:expr; $desc:expr
+    ) => ({
+        $func(Err(new_err!($kind; $desc)));
+        return;
+    });
+    (
+        ($func:expr) $kind:expr; $desc:expr, $($arg:tt)*
+    ) => ({
+        $func(Err(new_err!($kind; $desc, $($arg)*)));
+        return;
+    });
+    (
+        ($func:expr) $kind:expr, $cause:expr; $desc:expr
+    ) => ({
+        $func(Err(new_err!($kind, $cause; $desc)));
+        return;
+    });
+    (
+        ($func:expr) $kind:expr, $cause:expr; $desc:expr, $($arg:tt)*
+    ) => ({
+        $func(Err(new_err!($kind, $cause; $desc, $($arg)*)));
+        return;
+    });
+
+    (
+        ($func:expr; $ret:expr) $kind:expr; $desc:expr
+    ) => ({
+        $func(Err(new_err!($kind; $desc)));
+        return $ret;
+    });
+    (
+        ($func:expr; $ret:expr) $kind:expr; $desc:expr, $($arg:tt)*
+    ) => ({
+        $func(Err(new_err!($kind; $desc, $($arg)*)));
+        return $ret;
+    });
+    (
+        ($func:expr; $ret:expr) $kind:expr, $cause:expr; $desc:expr
+    ) => ({
+        $func(Err(new_err!($kind, $cause; $desc)));
+        return $ret;
+    });
+    (
+        ($func:expr; $ret:expr) $kind:expr, $cause:expr; $desc:expr, $($arg:tt)*
+    ) => ({
+        $func(Err(new_err!($kind, $cause; $desc, $($arg)*)));
+        return $ret;
+    });
+}
+
+
+#[macro_export]
+macro_rules! f_attempt
+{
+    (
+        ($func:expr) $expr:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => {
+                $func(Err(from_err!(e)));
+                return;
+            },
+        }
+    );
+    (
+        ($func:expr) $expr:expr => $desc:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => {
+                $func(Err(from_err!(e; $desc)));
+                return;
+            },
+        }
+    );
+    (
+        ($func:expr) $expr:expr => $desc:expr, $($arg:tt)*
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => {
+                $func(Err(from_err!(e; $desc, $($arg)*)));
+                return;
+            },
+        }
+    );
+
+    (
+        ($func:expr; $ret:expr) $expr:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => {
+                $func(Err(from_err!(e)));
+                return $ret;
+            },
+        }
+    );
+    (
+        ($func:expr; $ret:expr) $expr:expr => $desc:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => {
+                $func(Err(from_err!(e; $desc)));
+                return $ret;
+            },
+        }
+    );
+    (
+        ($func:expr; $ret:expr) $expr:expr => $desc:expr, $($arg:tt)*
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => {
+                $func(Err(from_err!(e; $desc, $($arg)*)));
+                return $ret;
+            },
+        }
+    );
+}
+
+
+#[macro_export]
+macro_rules! f_attempt_err
+{
+    (
+        ($func:ident) $expr:expr => $kind_fn:expr; $desc:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => f_err!(($func) $kind_fn(&e), e; $desc),
+        }
+    );
+    (
+        ($func:ident) $expr:expr => $kind_fn:expr; $desc:expr, $($arg:tt)*
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => f_err!(($func) $kind_fn(&e), e; $desc, $($arg)*),
+        }
+    );
+    (
+        ($func:ident) $expr:expr => $kind_fn:expr, $err_fn:expr; $desc:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e) => {
+                let kind = $kind_fn(&e);
+                let cause = $err_fn(e);
+                f_err!(($func) kind, cause; $desc)
+            },
+        }
+    );
+    (
+        ($func:ident) $expr:expr => $kind_fn:expr, $err_fn:expr; $desc:expr, $($arg:tt)*
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e) => {
+                let kind = $kind_fn(&e);
+                let cause = $err_fn(e);
+                f_err!(($func) kind, cause; $desc, $($arg)*)
+            },
+        }
+    );
+
+    (
+        ($func:ident; $ret:expr) $expr:expr => $kind_fn:expr; $desc:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => f_err!(($func; $ret) $kind_fn(&e), e; $desc),
+        }
+    );
+    (
+        ($func:ident; $ret:expr) $expr:expr => $kind_fn:expr; $desc:expr, $($arg:tt)*
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e)  => f_err!(($func; $ret) $kind_fn(&e), e; $desc, $($arg)*),
+        }
+    );
+    (
+        ($func:ident; $ret:expr) $expr:expr => $kind_fn:expr, $err_fn:expr; $desc:expr
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e) => {
+                let kind = $kind_fn(&e);
+                let cause = $err_fn(e);
+                f_err!(($func; $ret) kind, cause; $desc)
+            },
+        }
+    );
+    (
+        ($func:ident; $ret:expr) $expr:expr => $kind_fn:expr, $err_fn:expr; $desc:expr, $($arg:tt)*
+    ) => (
+        match $expr {
+            Ok(val) => val,
+            Err(e) => {
+                let kind = $kind_fn(&e);
+                let cause = $err_fn(e);
+                f_err!(($func; $ret) kind, cause; $desc, $($arg)*)
+            },
+        }
+    );
+}
+
+
+
+
 
 
 #[cfg(feature = "alternate-future")]
@@ -426,7 +663,7 @@ macro_rules! p_attempt_err
     ) => (
         match $expr {
             Ok(val) => val,
-            Err(e)  => p_err!(($prom) $kind_fn(&e), e.into(); $desc),
+            Err(e)  => p_err!(($prom) $kind_fn(&e), e; $desc),
         }
     );
     (
@@ -434,7 +671,7 @@ macro_rules! p_attempt_err
     ) => (
         match $expr {
             Ok(val) => val,
-            Err(e)  => p_err!(($prom) $kind_fn(&e), e.into(); $desc, $($arg)*),
+            Err(e)  => p_err!(($prom) $kind_fn(&e), e; $desc, $($arg)*),
         }
     );
     (
@@ -444,7 +681,7 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e).into();
+                let cause = $err_fn(e);
                 p_err!(($prom) kind, cause; $desc)
             },
         }
@@ -456,7 +693,7 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e).into();
+                let cause = $err_fn(e);
                 p_err!(($prom) kind, cause; $desc, $($arg)*)
             },
         }
@@ -467,7 +704,7 @@ macro_rules! p_attempt_err
     ) => (
         match $expr {
             Ok(val) => val,
-            Err(e)  => p_err!(($prom; $ret) $kind_fn(&e), e.into(); $desc),
+            Err(e)  => p_err!(($prom; $ret) $kind_fn(&e), e; $desc),
         }
     );
     (
@@ -475,7 +712,7 @@ macro_rules! p_attempt_err
     ) => (
         match $expr {
             Ok(val) => val,
-            Err(e)  => p_err!(($prom; $ret) $kind_fn(&e), e.into(); $desc, $($arg)*),
+            Err(e)  => p_err!(($prom; $ret) $kind_fn(&e), e; $desc, $($arg)*),
         }
     );
     (
@@ -485,7 +722,7 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e).into();
+                let cause = $err_fn(e);
                 p_err!(($prom; $ret) kind, cause; $desc)
             },
         }
@@ -497,17 +734,12 @@ macro_rules! p_attempt_err
             Ok(val) => val,
             Err(e) => {
                 let kind = $kind_fn(&e);
-                let cause = $err_fn(e).into();
+                let cause = $err_fn(e);
                 p_err!(($prom; $ret) kind, cause; $desc, $($arg)*)
             },
         }
     );
 }
-
-
-#[allow(dead_code)]
-#[inline(always)]
-pub fn coerce_box (e : Box<std::error::Error + Send + Sync>) -> Box<std::error::Error + Send + Sync> { e }
 
 
 #[derive(Clone)]
